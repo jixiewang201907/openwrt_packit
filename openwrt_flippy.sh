@@ -28,14 +28,17 @@ PACKAGE_FILE="openwrt-armvirt-64-default-rootfs.tar.gz"
 # Set the list of supported device
 PACKAGE_OPENWRT=(
     "rock5b" "h88k"
+    "r66s" "r68s" "h66k" "h68k" "e25"
+    "beikeyun" "l1pro"
     "vplus"
-    "beikeyun" "l1pro" "r66s" "r68s" "h66k" "h68k" "e25"
     "s922x" "s922x-n2" "s905x3" "s905x2" "s912" "s905d" "s905"
     "qemu"
     "diy"
 )
 # Set the list of devices using the [ rk3588 ] kernel
 PACKAGE_OPENWRT_RK3588=("rock5b" "h88k")
+# Set the list of devices using the [ 6.0.y and above ] kernel
+PACKAGE_OPENWRT_KERNEL6=("r66s" "r68s" "h66k" "h68k" "e25")
 # All are packaged by default, and independent settings are supported, such as: [ s905x3_s905d_rock5b ]
 PACKAGE_SOC_VALUE="all"
 
@@ -89,6 +92,7 @@ DISTRIB_DESCRIPTION_VALUE="OpenWrt"
 STEPS="[\033[95m STEPS \033[0m]"
 INFO="[\033[94m INFO \033[0m]"
 SUCCESS="[\033[92m SUCCESS \033[0m]"
+PROMPT="[\033[93m PROMPT \033[0m]"
 WARNING="[\033[93m WARNING \033[0m]"
 ERROR="[\033[91m ERROR \033[0m]"
 #
@@ -117,6 +121,7 @@ init_var() {
     [[ -n "${SELECT_PACKITPATH}" ]] || SELECT_PACKITPATH="${SELECT_PACKITPATH_VALUE}"
     [[ -n "${SELECT_OUTPUTPATH}" ]] || SELECT_OUTPUTPATH="${SELECT_OUTPUTPATH_VALUE}"
     [[ -n "${SAVE_OPENWRT_ARMVIRT}" ]] || SAVE_OPENWRT_ARMVIRT="${SAVE_OPENWRT_ARMVIRT_VALUE}"
+    [[ -n "${GH_TOKEN}" ]] && GH_TOKEN="${GH_TOKEN}" || GH_TOKEN=""
 
     # Specify the default packaging script
     [[ -n "${SCRIPT_VPLUS}" ]] || SCRIPT_VPLUS="${SCRIPT_VPLUS_FILE}"
@@ -249,15 +254,26 @@ auto_kernel() {
             i=1
             for KERNEL_VAR in ${down_kernel_list[*]}; do
                 echo -e "${INFO} (${i}) Auto query the latest kernel version of the same series for [ ${vb} - ${KERNEL_VAR} ]"
+
+                # Identify the kernel mainline
                 MAIN_LINE="$(echo ${KERNEL_VAR} | awk -F '.' '{print $1"."$2}')"
+
                 # Check the version on the server (e.g LATEST_VERSION="125")
-                LATEST_VERSION="$(curl -s "${SERVER_KERNEL_URL}/${vb}" | grep "name" | grep -oE "${MAIN_LINE}.[0-9]+" | sed -e "s/${MAIN_LINE}.//g" | sort -n | sed -n '$p')"
+                if [[ -n "${GH_TOKEN}" ]]; then
+                    LATEST_VERSION="$(curl --header "authorization: Bearer ${GH_TOKEN}" -s "${SERVER_KERNEL_URL}/${vb}" | grep "name" | grep -oE "${MAIN_LINE}.[0-9]+" | sed -e "s/${MAIN_LINE}.//g" | sort -n | sed -n '$p')"
+                    query_api="Authenticated user request"
+                else
+                    LATEST_VERSION="$(curl -s "${SERVER_KERNEL_URL}/${vb}" | grep "name" | grep -oE "${MAIN_LINE}.[0-9]+" | sed -e "s/${MAIN_LINE}.//g" | sort -n | sed -n '$p')"
+                    query_api="Unauthenticated user request"
+                fi
+
                 if [[ "$?" -eq "0" && -n "${LATEST_VERSION}" ]]; then
                     TMP_ARR_KERNELS[${i}]="${MAIN_LINE}.${LATEST_VERSION}"
                 else
                     TMP_ARR_KERNELS[${i}]="${KERNEL_VAR}"
                 fi
-                echo -e "${INFO} (${i}) [ ${vb} - ${TMP_ARR_KERNELS[$i]} ] is latest kernel."
+
+                echo -e "${INFO} (${i}) [ ${vb} - ${TMP_ARR_KERNELS[$i]} ] is latest kernel(${query_api})."
 
                 let i++
             done
@@ -335,6 +351,20 @@ make_openwrt() {
             k="1"
             for KERNEL_VAR in ${build_kernel[*]}; do
                 {
+                   # Rockchip rk3568 series only support 6.0.y and above kernel
+                    [[ -n "$(echo "${PACKAGE_OPENWRT_KERNEL6[@]}" | grep -w "${PACKAGE_VAR}")" && "${KERNEL_VAR:0:1}" -ne "6" ]] && {
+                        echo -e "${STEPS} (${i}.${k}) ${PROMPT} ${PACKAGE_VAR} cannot use ${KERNEL_VAR} kernel, skip."
+                        let k++
+                        continue
+                    }
+
+                    # Check the available size of server space
+                    now_remaining_space="$(df -Tk ${PWD} | grep '/dev/' | awk '{print $5}' | echo $(($(xargs) / 1024 / 1024)))"
+                    [[ "${now_remaining_space}" -le "3" ]] && {
+                        echo -e "${WARNING} If the remaining space is less than 3G, exit this packaging. \n"
+                        break
+                    }
+
                     cd /opt/kernel
 
                     # Copy the kernel to the packaging directory
@@ -346,6 +376,7 @@ make_openwrt() {
                     boot_kernel_file="${boot_kernel_file//.tar.gz/}"
                     [[ "${vb}" == "rk3588" ]] && rk3588_file="${boot_kernel_file}" || rk3588_file=""
                     echo -e "${STEPS} (${i}.${k}) Start packaging OpenWrt: [ ${PACKAGE_VAR} ], Kernel directory: [ ${vb} ], Kernel name: [ ${boot_kernel_file} ]"
+                    echo -e "${INFO} Remaining space is ${now_remaining_space}G. \n"
 
                     cd /opt/${SELECT_PACKITPATH}
 
@@ -376,15 +407,6 @@ EOF
 
                     echo -e "${INFO} make.env file info:"
                     cat make.env
-
-                    # Check the available size of server space
-                    now_remaining_space="$(df -Tk ${PWD} | grep '/dev/' | awk '{print $5}' | echo $(($(xargs) / 1024 / 1024)))"
-                    if [[ "${now_remaining_space}" -le "3" ]]; then
-                        echo -e "${WARNING} If the remaining space is less than 3G, exit this packaging. \n"
-                        break 2
-                    else
-                        echo -e "${INFO} Remaining space is ${now_remaining_space}G. \n"
-                    fi
 
                     # Select the corresponding packaging script
                     case "${PACKAGE_VAR}" in
