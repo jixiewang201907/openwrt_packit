@@ -41,6 +41,13 @@ elif [[ "$(echo ${MYDEVICE_NAME} | grep "BeikeYun")" != "" ]]; then
         MYDTB_FDTFILE="rk3328-beikeyun-1296mhz.dtb"
     fi
     SOC="beikeyun"
+elif [[ "$(echo ${MYDEVICE_NAME} | grep "Radxa CM3 RPI CM4 IO")" != "" ]]; then
+    if [ -n "${CURRENT_FDTFILE}" ]; then
+        MYDTB_FDTFILE="${CURRENT_FDTFILE}"
+    else
+        MYDTB_FDTFILE="rk3566-radxa-cm3-rpi-cm4-io.dtb"
+    fi
+    SOC="radxa-cm3-rpi-cm4-io"
 elif [[ "$(echo ${MYDEVICE_NAME} | grep "FastRhino R66S")" != "" ]]; then
     if [ -n "${CURRENT_FDTFILE}" ]; then
         MYDTB_FDTFILE="${CURRENT_FDTFILE}"
@@ -69,6 +76,13 @@ elif [[ "$(echo ${MYDEVICE_NAME} | grep "HINLINK OPC-H68K Board")" != "" ]]; the
         MYDTB_FDTFILE="rk3568-opc-h68k.dtb"
     fi
     SOC="h68k"
+elif [[ "$(echo ${MYDEVICE_NAME} | grep "HINLINK OPC-H69K Board")" != "" ]]; then
+    if [ -n "${CURRENT_FDTFILE}" ]; then
+        MYDTB_FDTFILE="${CURRENT_FDTFILE}"
+    else
+        MYDTB_FDTFILE="rk3568-opc-h69k.dtb"
+    fi
+    SOC="h69k"
 elif [[ "$(echo ${MYDEVICE_NAME} | grep "Radxa E25")" != "" ]]; then
     if [ -n "${CURRENT_FDTFILE}" ]; then
         MYDTB_FDTFILE="${CURRENT_FDTFILE}"
@@ -83,6 +97,13 @@ elif [[ "$(echo ${MYDEVICE_NAME} | grep "Ariaboard Photonicat")" != "" ]]; then
         MYDTB_FDTFILE="rk3568-photonicat.dtb"
     fi
     SOC="photonicat"
+elif [[ "$(echo ${MYDEVICE_NAME} | grep "Watermelon Pi")" != "" ]]; then
+    if [ -n "${CURRENT_FDTFILE}" ]; then
+        MYDTB_FDTFILE="${CURRENT_FDTFILE}"
+    else
+        MYDTB_FDTFILE="rk3568-watermelon-pi.dtb"
+    fi
+    SOC="watermelon-pi"
 elif [[ "$(echo ${MYDEVICE_NAME} | grep "Radxa ROCK 5B")" != "" ]]; then
     if [ -n "${CURRENT_FDTFILE}" ]; then
         MYDTB_FDTFILE="${CURRENT_FDTFILE}"
@@ -90,6 +111,13 @@ elif [[ "$(echo ${MYDEVICE_NAME} | grep "Radxa ROCK 5B")" != "" ]]; then
         MYDTB_FDTFILE="rk3588-rock-5b.dtb"
     fi
     SOC="rock5b"
+elif [[ "$(echo ${MYDEVICE_NAME} | grep "HINLINK OWL H88K-V3")" != "" ]]; then
+    if [ -n "${CURRENT_FDTFILE}" ]; then
+        MYDTB_FDTFILE="${CURRENT_FDTFILE}"
+    else
+        MYDTB_FDTFILE="rk3588-hinlink-h88k-v3.dtb"
+    fi
+    SOC="h88k-v3"
 elif [[ "$(echo ${MYDEVICE_NAME} | grep "HINLINK OWL H88K")" != "" ]]; then
     if [ -n "${CURRENT_FDTFILE}" ]; then
         MYDTB_FDTFILE="${CURRENT_FDTFILE}"

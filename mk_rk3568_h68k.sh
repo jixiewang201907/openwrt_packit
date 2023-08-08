@@ -28,8 +28,7 @@ check_file ${DTBS_TGZ}
 ###################################################################
 
 # Openwrt 
-OP_ROOT_TGZ="openwrt-armvirt-64-default-rootfs.tar.gz"
-OPWRT_ROOTFS_GZ="${PWD}/${OP_ROOT_TGZ}"
+OPWRT_ROOTFS_GZ=$(get_openwrt_rootfs_archive ${PWD})
 check_file ${OPWRT_ROOTFS_GZ}
 echo "Use $OPWRT_ROOTFS_GZ as openwrt rootfs!"
 
@@ -113,6 +112,8 @@ MODULES_HOME="${PWD}/files/rk3568/modules.d"
 BOARD_MODULES_HOME="${PWD}/files/rk3568/h68k/modules.d"
 # 20221013 add
 WIRELESS_CONFIG="${PWD}/files/rk3568/h68k/wireless"
+# 20230622 add
+NETWORK_SERVICE_PATCH="${PWD}/files/rk3568/h68k/network.patch"
 ####################################################################
 
 check_depends

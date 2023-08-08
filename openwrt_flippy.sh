@@ -11,7 +11,7 @@
 # error_msg         : Output error message
 # init_var          : Initialize all variables
 # init_packit_repo  : Initialize packit openwrt repo
-# auto_kernel       : Automatically use the latest kernel
+# query_kernel      : Query the latest kernel version
 # check_kernel      : Check kernel files integrity
 # download_kernel   : Download the kernel
 # make_openwrt      : Loop to make OpenWrt files
@@ -24,12 +24,12 @@ SCRIPT_REPO_URL_VALUE="https://github.com/unifreq/openwrt_packit"
 SCRIPT_REPO_BRANCH_VALUE="master"
 
 # Set the *rootfs.tar.gz package save name
-PACKAGE_FILE="openwrt-armvirt-64-default-rootfs.tar.gz"
+PACKAGE_FILE="openwrt-armvirt-64-generic-rootfs.tar.gz"
 
 # Set the list of supported device
 PACKAGE_OPENWRT=(
-    "rock5b" "h88k" "ak88"
-    "r66s" "r68s" "h66k" "h68k" "e25" "photonicat"
+    "rock5b" "h88k" "h88k-v3" "ak88"
+    "r66s" "r68s" "h66k" "h68k" "h69k" "h69k-max" "e25" "photonicat" "cm3"
     "beikeyun" "l1pro"
     "vplus"
     "s922x" "s922x-n2" "s905x3" "s905x2" "s912" "s905d" "s905"
@@ -37,18 +37,18 @@ PACKAGE_OPENWRT=(
     "diy"
 )
 # Set the list of devices using the [ rk3588 ] kernel
-PACKAGE_OPENWRT_RK3588=("rock5b" "h88k" "ak88")
+PACKAGE_OPENWRT_RK3588=("rock5b" "h88k" "h88k-v3" "ak88")
 # Set the list of devices using the [ 6.x.y ] kernel
-PACKAGE_OPENWRT_KERNEL6=("r66s" "r68s" "h66k" "h68k" "e25" "photonicat")
+PACKAGE_OPENWRT_KERNEL6=("r66s" "r68s" "h66k" "h68k" "h69k" "h69k-max" "e25" "photonicat" "cm3")
 # All are packaged by default, and independent settings are supported, such as: [ s905x3_s905d_rock5b ]
 PACKAGE_SOC_VALUE="all"
 
 # Set the default packaged kernel download repository
 KERNEL_REPO_URL_VALUE="breakings/OpenWrt"
-# Common releases kernel tag: kernel_stable, kernel_rk3588
-KERNEL_DIR=("stable" "rk3588")
-COMMON_KERNEL=("6.1.1" "5.15.1")
-RK3588_KERNEL=("5.10.1")
+# Set kernel tag: kernel_stable, kernel_rk3588
+KERNEL_TAGS=("stable" "rk3588")
+STABLE_KERNEL=("6.1.1" "5.15.1")
+RK3588_KERNEL=("5.10.110")
 KERNEL_AUTO_LATEST_VALUE="true"
 
 # Set the working directory under /opt
@@ -61,14 +61,17 @@ SAVE_OPENWRT_ARMVIRT_VALUE="true"
 SCRIPT_VPLUS_FILE="mk_h6_vplus.sh"
 SCRIPT_BEIKEYUN_FILE="mk_rk3328_beikeyun.sh"
 SCRIPT_L1PRO_FILE="mk_rk3328_l1pro.sh"
+SCRIPT_CM3_FILE="mk_rk3566_radxa-cm3-rpi-cm4-io.sh"
 SCRIPT_R66S_FILE="mk_rk3568_r66s.sh"
 SCRIPT_R68S_FILE="mk_rk3568_r68s.sh"
 SCRIPT_H66K_FILE="mk_rk3568_h66k.sh"
 SCRIPT_H68K_FILE="mk_rk3568_h68k.sh"
+SCRIPT_H69K_FILE="mk_rk3568_h69k.sh"
 SCRIPT_E25_FILE="mk_rk3568_e25.sh"
 SCRIPT_PHOTONICAT_FILE="mk_rk3568_photonicat.sh"
 SCRIPT_ROCK5B_FILE="mk_rk3588_rock5b.sh"
 SCRIPT_H88K_FILE="mk_rk3588_h88k.sh"
+SCRIPT_H88KV3_FILE="mk_rk3588_h88k-v3.sh"
 SCRIPT_S905_FILE="mk_s905_mxqpro+.sh"
 SCRIPT_S905D_FILE="mk_s905d_n1.sh"
 SCRIPT_S905X2_FILE="mk_s905x2_x96max.sh"
@@ -129,14 +132,17 @@ init_var() {
     [[ -n "${SCRIPT_VPLUS}" ]] || SCRIPT_VPLUS="${SCRIPT_VPLUS_FILE}"
     [[ -n "${SCRIPT_BEIKEYUN}" ]] || SCRIPT_BEIKEYUN="${SCRIPT_BEIKEYUN_FILE}"
     [[ -n "${SCRIPT_L1PRO}" ]] || SCRIPT_L1PRO="${SCRIPT_L1PRO_FILE}"
+    [[ -n "${SCRIPT_CM3}" ]] || SCRIPT_CM3="${SCRIPT_CM3_FILE}"
     [[ -n "${SCRIPT_R66S}" ]] || SCRIPT_R66S="${SCRIPT_R66S_FILE}"
     [[ -n "${SCRIPT_R68S}" ]] || SCRIPT_R68S="${SCRIPT_R68S_FILE}"
     [[ -n "${SCRIPT_H66K}" ]] || SCRIPT_H66K="${SCRIPT_H66K_FILE}"
     [[ -n "${SCRIPT_H68K}" ]] || SCRIPT_H68K="${SCRIPT_H68K_FILE}"
+    [[ -n "${SCRIPT_H69K}" ]] || SCRIPT_H69K="${SCRIPT_H69K_FILE}"
     [[ -n "${SCRIPT_E25}" ]] || SCRIPT_E25="${SCRIPT_E25_FILE}"
     [[ -n "${SCRIPT_PHOTONICAT}" ]] || SCRIPT_PHOTONICAT="${SCRIPT_PHOTONICAT_FILE}"
     [[ -n "${SCRIPT_ROCK5B}" ]] || SCRIPT_ROCK5B="${SCRIPT_ROCK5B_FILE}"
     [[ -n "${SCRIPT_H88K}" ]] || SCRIPT_H88K="${SCRIPT_H88K_FILE}"
+    [[ -n "${SCRIPT_H88KV3}" ]] || SCRIPT_H88KV3="${SCRIPT_H88KV3_FILE}"
     [[ -n "${SCRIPT_S905}" ]] || SCRIPT_S905="${SCRIPT_S905_FILE}"
     [[ -n "${SCRIPT_S905D}" ]] || SCRIPT_S905D="${SCRIPT_S905D_FILE}"
     [[ -n "${SCRIPT_S905X2}" ]] || SCRIPT_S905X2="${SCRIPT_S905X2_FILE}"
@@ -161,29 +167,42 @@ init_var() {
     # Confirm package object
     [[ "${PACKAGE_SOC}" != "all" ]] && {
         unset PACKAGE_OPENWRT
-        oldIFS=$IFS
-        IFS=_
+        oldIFS="${IFS}"
+        IFS="_"
         PACKAGE_OPENWRT=(${PACKAGE_SOC})
-        IFS=$oldIFS
+        IFS="${oldIFS}"
+
+        # Reset required kernel tags
+        KERNEL_TAGS_TMP=()
+        for kt in "${PACKAGE_OPENWRT[@]}"; do
+            if [[ " ${PACKAGE_OPENWRT_RK3588[@]} " =~ " ${kt} " ]]; then
+                KERNEL_TAGS_TMP+=("rk3588")
+            else
+                KERNEL_TAGS_TMP+=("stable")
+            fi
+        done
+        # Remove duplicate kernel tags
+        KERNEL_TAGS=()
+        KERNEL_TAGS=($(echo "${KERNEL_TAGS_TMP[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
     }
-    echo -e "${INFO} Package OpenWrt List: [ ${PACKAGE_OPENWRT[*]} ]"
+    echo -e "${INFO} Package SoC: [ $(echo ${PACKAGE_OPENWRT[@]} | xargs) ]"
+    echo -e "${INFO} Kernel tags: [ $(echo ${KERNEL_TAGS[@]} | xargs) ]"
+
+    # Reset STABLE_KERNEL options
+    [[ -n "${KERNEL_VERSION_NAME}" && " ${KERNEL_TAGS[@]} " =~ " stable " ]] && {
+        unset STABLE_KERNEL
+        oldIFS="${IFS}"
+        IFS="_"
+        STABLE_KERNEL=(${KERNEL_VERSION_NAME})
+        IFS="${oldIFS}"
+        echo -e "${INFO} Stable kernel: [ $(echo ${STABLE_KERNEL[@]} | xargs) ]"
+    }
 
     # Convert kernel library address to api format
     echo -e "${INFO} Kernel download repository: [ ${KERNEL_REPO_URL} ]"
     [[ "${KERNEL_REPO_URL}" =~ ^https: ]] && KERNEL_REPO_URL="$(echo ${KERNEL_REPO_URL} | awk -F'/' '{print $4"/"$5}')"
     kernel_api="https://api.github.com/repos/${KERNEL_REPO_URL}"
     echo -e "${INFO} Kernel Query API: [ ${kernel_api} ]"
-
-    # Reset COMMON_KERNEL options
-    [[ -n "${KERNEL_VERSION_NAME}" ]] && {
-        unset COMMON_KERNEL
-        oldIFS=$IFS
-        IFS=_
-        COMMON_KERNEL=(${KERNEL_VERSION_NAME})
-        IFS=$oldIFS
-    }
-    echo -e "${INFO} Common Kernel List: [ ${COMMON_KERNEL[*]} ]"
-    echo -e "${INFO} RK3588 Kernel List: [ ${RK3588_KERNEL[*]} ]"
 }
 
 init_packit_repo() {
@@ -197,9 +216,10 @@ init_packit_repo() {
     [[ -z "${OPENWRT_ARMVIRT}" ]] && error_msg "The [ OPENWRT_ARMVIRT ] variable must be specified."
 
     # Load *-armvirt-64-default-rootfs.tar.gz
+    rm -f ${SELECT_PACKITPATH}/${PACKAGE_FILE}
     if [[ "${OPENWRT_ARMVIRT}" == http* ]]; then
         echo -e "${STEPS} wget [ ${OPENWRT_ARMVIRT} ] file into [ ${SELECT_PACKITPATH} ]"
-        wget ${OPENWRT_ARMVIRT} -q -O "${SELECT_PACKITPATH}/${PACKAGE_FILE}"
+        wget ${OPENWRT_ARMVIRT} -q -O ${SELECT_PACKITPATH}/${PACKAGE_FILE}
         [[ "${?}" -eq "0" ]] || error_msg "Openwrt rootfs file download failed."
     else
         echo -e "${STEPS} copy [ ${GITHUB_WORKSPACE}/${OPENWRT_ARMVIRT} ] file into [ ${SELECT_PACKITPATH} ]"
@@ -218,9 +238,10 @@ init_packit_repo() {
 
     # Add custom script
     [[ -n "${SCRIPT_DIY_PATH}" ]] && {
+        rm -f ${SELECT_PACKITPATH}/${SCRIPT_DIY}
         if [[ "${SCRIPT_DIY_PATH}" == http* ]]; then
             echo -e "${INFO} Use wget to download custom script file: [ ${SCRIPT_DIY_PATH} ]"
-            wget ${SCRIPT_DIY_PATH} -q -O "${SELECT_PACKITPATH}/${SCRIPT_DIY}"
+            wget ${SCRIPT_DIY_PATH} -q -O ${SELECT_PACKITPATH}/${SCRIPT_DIY}
             [[ "${?}" -eq "0" ]] || error_msg "Custom script file download failed."
         else
             echo -e "${INFO} Copy custom script file: [ ${SCRIPT_DIY_PATH} ]"
@@ -232,51 +253,42 @@ init_packit_repo() {
     }
 }
 
-auto_kernel() {
+query_kernel() {
     echo -e "${STEPS} Start querying the latest kernel..."
 
     # Check the version on the kernel library
     x="1"
-    for vb in ${KERNEL_DIR[*]}; do
+    for vb in ${KERNEL_TAGS[@]}; do
         {
             # Select the corresponding kernel directory and list
             if [[ "${vb}" == "rk3588" ]]; then
-                down_kernel_list=(${RK3588_KERNEL[*]})
+                down_kernel_list=(${RK3588_KERNEL[@]})
             else
-                down_kernel_list=(${COMMON_KERNEL[*]})
+                down_kernel_list=(${STABLE_KERNEL[@]})
             fi
 
             # Query the name of the latest kernel version
             TMP_ARR_KERNELS=()
             i=1
-            for kernel_var in ${down_kernel_list[*]}; do
+            for kernel_var in ${down_kernel_list[@]}; do
                 echo -e "${INFO} (${i}) Auto query the latest kernel version of the same series for [ ${vb} - ${kernel_var} ]"
 
                 # Identify the kernel <VERSION> and <PATCHLEVEL>, such as [ 6.1 ]
                 kernel_verpatch="$(echo ${kernel_var} | awk -F '.' '{print $1"."$2}')"
 
-                if [[ -n "${GH_TOKEN}" ]]; then
-                    latest_version="$(
-                        curl -s \
-                            -H "Accept: application/vnd.github+json" \
-                            -H "Authorization: Bearer ${GH_TOKEN}" \
-                            ${kernel_api}/releases/tags/kernel_${vb} |
-                            jq -r '.assets[].name' |
-                            grep -oE "${kernel_verpatch}\.[0-9]+" |
-                            sort -rV | head -n 1
-                    )"
-                    query_api="Authenticated user request"
-                else
-                    latest_version="$(
-                        curl -s \
-                            -H "Accept: application/vnd.github+json" \
-                            ${kernel_api}/releases/tags/kernel_${vb} |
-                            jq -r '.assets[].name' |
-                            grep -oE "${kernel_verpatch}\.[0-9]+" |
-                            sort -rV | head -n 1
-                    )"
-                    query_api="Unauthenticated user request"
-                fi
+                # Set the token for api.github.com
+                [[ -n "${GH_TOKEN}" ]] && ght="-H \"Authorization: Bearer ${GH_TOKEN}\"" || ght=""
+
+                # Query the latest kernel version
+                latest_version="$(
+                    curl -s \
+                        -H "Accept: application/vnd.github+json" \
+                        ${ght} \
+                        ${kernel_api}/releases/tags/kernel_${vb} |
+                        jq -r '.assets[].name' |
+                        grep -oE "${kernel_verpatch}\.[0-9]+" |
+                        sort -rV | head -n 1
+                )"
 
                 if [[ "$?" -eq "0" && -n "${latest_version}" ]]; then
                     TMP_ARR_KERNELS[${i}]="${latest_version}"
@@ -284,7 +296,7 @@ auto_kernel() {
                     TMP_ARR_KERNELS[${i}]="${kernel_var}"
                 fi
 
-                echo -e "${INFO} (${i}) [ ${vb} - ${TMP_ARR_KERNELS[$i]} ] is latest kernel (${query_api})."
+                echo -e "${INFO} (${i}) [ ${vb} - ${TMP_ARR_KERNELS[$i]} ] is latest kernel."
 
                 let i++
             done
@@ -292,25 +304,24 @@ auto_kernel() {
             # Reset the kernel array to the latest kernel version
             if [[ "${vb}" == "rk3588" ]]; then
                 unset RK3588_KERNEL
-                RK3588_KERNEL=(${TMP_ARR_KERNELS[*]})
+                RK3588_KERNEL=(${TMP_ARR_KERNELS[@]})
+                echo -e "${INFO} The latest version of the rk3588 kernel: [ ${RK3588_KERNEL[@]} ]"
             else
-                unset COMMON_KERNEL
-                COMMON_KERNEL=(${TMP_ARR_KERNELS[*]})
+                unset STABLE_KERNEL
+                STABLE_KERNEL=(${TMP_ARR_KERNELS[@]})
+                echo -e "${INFO} The latest version of the stable kernel: [ ${STABLE_KERNEL[@]} ]"
             fi
 
             let x++
         }
     done
-
-    echo -e "${INFO} The latest version of the common kernel: [ ${COMMON_KERNEL[*]} ]"
-    echo -e "${INFO} The latest version of the rk3588 kernel: [ ${RK3588_KERNEL[*]} ]"
 }
 
 check_kernel() {
     [[ -n "${1}" ]] && check_path="${1}" || error_msg "Invalid kernel path to check."
     check_files=($(cat "${check_path}/sha256sums" | awk '{print $2}'))
     m="1"
-    for cf in ${check_files[*]}; do
+    for cf in ${check_files[@]}; do
         {
             # Check if file exists
             [[ -s "${check_path}/${cf}" ]] || error_msg "The [ ${cf} ] file is missing."
@@ -321,7 +332,7 @@ check_kernel() {
             let m++
         }
     done
-    echo -e "${INFO} All [ ${#check_files[*]} ] kernel files are sha256sum checked to be complete.\n"
+    echo -e "${INFO} All [ ${#check_files[@]} ] kernel files are sha256sum checked to be complete.\n"
 }
 
 download_kernel() {
@@ -330,13 +341,13 @@ download_kernel() {
     cd /opt
 
     x="1"
-    for vb in ${KERNEL_DIR[*]}; do
+    for vb in ${KERNEL_TAGS[@]}; do
         {
             # Set the kernel download list
             if [[ "${vb}" == "rk3588" ]]; then
-                down_kernel_list=(${RK3588_KERNEL[*]})
+                down_kernel_list=(${RK3588_KERNEL[@]})
             else
-                down_kernel_list=(${COMMON_KERNEL[*]})
+                down_kernel_list=(${STABLE_KERNEL[@]})
             fi
 
             # Kernel storage directory
@@ -345,7 +356,7 @@ download_kernel() {
 
             # Download the kernel to the storage directory
             i="1"
-            for kernel_var in ${down_kernel_list[*]}; do
+            for kernel_var in ${down_kernel_list[@]}; do
                 if [[ ! -d "${kernel_path}/${kernel_var}" ]]; then
                     kernel_down_from="https://github.com/${KERNEL_REPO_URL}/releases/download/kernel_${vb}/${kernel_var}.tar.gz"
                     echo -e "${INFO} (${x}.${i}) [ ${vb} - ${kernel_var} ] Kernel download from [ ${kernel_down_from} ]"
@@ -353,7 +364,7 @@ download_kernel() {
                     wget "${kernel_down_from}" -q -P "${kernel_path}"
                     [[ "${?}" -ne "0" ]] && error_msg "Failed to download the kernel files from the server."
 
-                    tar -xf "${kernel_path}/${kernel_var}.tar.gz" -C "${kernel_path}"
+                    tar -mxf "${kernel_path}/${kernel_var}.tar.gz" -C "${kernel_path}"
                     [[ "${?}" -ne "0" ]] && error_msg "[ ${kernel_var} ] kernel decompression failed."
                 else
                     echo -e "${INFO} (${x}.${i}) [ ${vb} - ${kernel_var} ] Kernel is in the local directory."
@@ -378,19 +389,19 @@ make_openwrt() {
     echo -e "${STEPS} Start packaging OpenWrt..."
 
     i="1"
-    for PACKAGE_VAR in ${PACKAGE_OPENWRT[*]}; do
+    for PACKAGE_VAR in ${PACKAGE_OPENWRT[@]}; do
         {
             # Distinguish between different OpenWrt and use different kernel
             if [[ -n "$(echo "${PACKAGE_OPENWRT_RK3588[@]}" | grep -w "${PACKAGE_VAR}")" ]]; then
-                build_kernel=(${RK3588_KERNEL[*]})
+                build_kernel=(${RK3588_KERNEL[@]})
                 vb="rk3588"
             else
-                build_kernel=(${COMMON_KERNEL[*]})
-                vb="$(echo "${KERNEL_DIR[@]}" | sed -e "s|rk3588||" | xargs)"
+                build_kernel=(${STABLE_KERNEL[@]})
+                vb="$(echo "${KERNEL_TAGS[@]}" | sed -e "s|rk3588||" | xargs)"
             fi
 
             k="1"
-            for kernel_var in ${build_kernel[*]}; do
+            for kernel_var in ${build_kernel[@]}; do
                 {
                     # Rockchip rk3568 series only support 6.x.y and above kernel
                     [[ -n "$(echo "${PACKAGE_OPENWRT_KERNEL6[@]}" | grep -w "${PACKAGE_VAR}")" && "${kernel_var:0:1}" -ne "6" ]] && {
@@ -450,27 +461,31 @@ EOF
 
                     # Select the corresponding packaging script
                     case "${PACKAGE_VAR}" in
-                        vplus)      [[ -f "${SCRIPT_VPLUS}" ]] && sudo ./${SCRIPT_VPLUS} ;;
-                        beikeyun)   [[ -f "${SCRIPT_BEIKEYUN}" ]] && sudo ./${SCRIPT_BEIKEYUN} ;;
-                        l1pro)      [[ -f "${SCRIPT_L1PRO}" ]] && sudo ./${SCRIPT_L1PRO} ;;
-                        r66s)       [[ -f "${SCRIPT_R66S}" ]] && sudo ./${SCRIPT_R66S} ;;
-                        r68s)       [[ -f "${SCRIPT_R68S}" ]] && sudo ./${SCRIPT_R68S} ;;
-                        h66k)       [[ -f "${SCRIPT_H66K}" ]] && sudo ./${SCRIPT_H66K} ;;
-                        h68k)       [[ -f "${SCRIPT_H68K}" ]] && sudo ./${SCRIPT_H68K} ;;
-                        rock5b)     [[ -f "${SCRIPT_ROCK5B}" ]] && sudo ./${SCRIPT_ROCK5B} ;;
-                        ak88)       [[ -f "${SCRIPT_H88K}" ]] && sudo ./${SCRIPT_H88K} ;;
-                        h88k)       [[ -f "${SCRIPT_H88K}" ]] && sudo ./${SCRIPT_H88K} "25" ;;
-                        e25)        [[ -f "${SCRIPT_E25}" ]] && sudo ./${SCRIPT_E25} ;;
+                        vplus)      [[ -f "${SCRIPT_VPLUS}" ]]      && sudo ./${SCRIPT_VPLUS} ;;
+                        beikeyun)   [[ -f "${SCRIPT_BEIKEYUN}" ]]   && sudo ./${SCRIPT_BEIKEYUN} ;;
+                        l1pro)      [[ -f "${SCRIPT_L1PRO}" ]]      && sudo ./${SCRIPT_L1PRO} ;;
+                        cm3)        [[ -f "${SCRIPT_CM3}" ]]        && sudo ./${SCRIPT_CM3} ;;
+                        r66s)       [[ -f "${SCRIPT_R66S}" ]]       && sudo ./${SCRIPT_R66S} ;;
+                        r68s)       [[ -f "${SCRIPT_R68S}" ]]       && sudo ./${SCRIPT_R68S} ;;
+                        h66k)       [[ -f "${SCRIPT_H66K}" ]]       && sudo ./${SCRIPT_H66K} ;;
+                        h68k)       [[ -f "${SCRIPT_H68K}" ]]       && sudo ./${SCRIPT_H68K} ;;
+                        h69k)       [[ -f "${SCRIPT_H69K}" ]]       && sudo ./${SCRIPT_H69K} ;;
+                        h69k-max)   [[ -f "${SCRIPT_H69K}" ]]       && sudo ./${SCRIPT_H69K} "max" ;;
+                        rock5b)     [[ -f "${SCRIPT_ROCK5B}" ]]     && sudo ./${SCRIPT_ROCK5B} ;;
+                        ak88)       [[ -f "${SCRIPT_H88K}" ]]       && sudo ./${SCRIPT_H88K} ;;
+                        h88k)       [[ -f "${SCRIPT_H88K}" ]]       && sudo ./${SCRIPT_H88K} "25" ;;
+                        h88k-v3)    [[ -f "${SCRIPT_H88KV3}" ]]     && sudo ./${SCRIPT_H88KV3} ;;
+                        e25)        [[ -f "${SCRIPT_E25}" ]]        && sudo ./${SCRIPT_E25} ;;
                         photonicat) [[ -f "${SCRIPT_PHOTONICAT}" ]] && sudo ./${SCRIPT_PHOTONICAT} ;;
-                        s905)       [[ -f "${SCRIPT_S905}" ]] && sudo ./${SCRIPT_S905} ;;
-                        s905d)      [[ -f "${SCRIPT_S905D}" ]] && sudo ./${SCRIPT_S905D} ;;
-                        s905x2)     [[ -f "${SCRIPT_S905X2}" ]] && sudo ./${SCRIPT_S905X2} ;;
-                        s905x3)     [[ -f "${SCRIPT_S905X3}" ]] && sudo ./${SCRIPT_S905X3} ;;
-                        s912)       [[ -f "${SCRIPT_S912}" ]] && sudo ./${SCRIPT_S912} ;;
-                        s922x)      [[ -f "${SCRIPT_S922X}" ]] && sudo ./${SCRIPT_S922X} ;;
-                        s922x-n2)   [[ -f "${SCRIPT_S922X_N2}" ]] && sudo ./${SCRIPT_S922X_N2} ;;
-                        qemu)       [[ -f "${SCRIPT_QEMU}" ]] && sudo ./${SCRIPT_QEMU} ;;
-                        diy)        [[ -f "${SCRIPT_DIY}" ]] && sudo ./${SCRIPT_DIY} ;;
+                        s905)       [[ -f "${SCRIPT_S905}" ]]       && sudo ./${SCRIPT_S905} ;;
+                        s905d)      [[ -f "${SCRIPT_S905D}" ]]      && sudo ./${SCRIPT_S905D} ;;
+                        s905x2)     [[ -f "${SCRIPT_S905X2}" ]]     && sudo ./${SCRIPT_S905X2} ;;
+                        s905x3)     [[ -f "${SCRIPT_S905X3}" ]]     && sudo ./${SCRIPT_S905X3} ;;
+                        s912)       [[ -f "${SCRIPT_S912}" ]]       && sudo ./${SCRIPT_S912} ;;
+                        s922x)      [[ -f "${SCRIPT_S922X}" ]]      && sudo ./${SCRIPT_S922X} ;;
+                        s922x-n2)   [[ -f "${SCRIPT_S922X_N2}" ]]   && sudo ./${SCRIPT_S922X_N2} ;;
+                        qemu)       [[ -f "${SCRIPT_QEMU}" ]]       && sudo ./${SCRIPT_QEMU} ;;
+                        diy)        [[ -f "${SCRIPT_DIY}" ]]        && sudo ./${SCRIPT_DIY} ;;
                         *)          echo -e "${WARNING} Have no this SoC. Skipped." && continue ;;
                     esac
 
@@ -510,8 +525,8 @@ out_github_env() {
             cp -f ../${PACKAGE_FILE} .
         fi
 
-        # Generate sha256sum check file
-        sha256sum * >sha256sums && sync
+        # Generate a sha256sum verification file for each OpenWrt file
+        for file in *; do [[ ! -d "${file}" ]] && sha256sum "${file}" >"${file}.sha"; done
 
         echo "PACKAGED_OUTPUTPATH=${PWD}" >>${GITHUB_ENV}
         echo "PACKAGED_OUTPUTDATE=$(date +"%m.%d.%H%M")" >>${GITHUB_ENV}
@@ -529,24 +544,14 @@ out_github_env() {
 
 # Show welcome message
 echo -e "${STEPS} Welcome to use the OpenWrt packaging tool! \n"
-
-# Initialize and download resources
-init_var
-init_packit_repo
-[[ "${KERNEL_AUTO_LATEST}" == "true" ]] && auto_kernel
-download_kernel
-
-# Show packit settings
-echo -e "${INFO} [ ${#PACKAGE_OPENWRT[*]} ] lists of OpenWrt board: [ $(echo ${PACKAGE_OPENWRT[*]} | xargs) ]"
-echo -e "${INFO} [ ${#COMMON_KERNEL[*]} ] lists of common kernel: [ $(echo ${COMMON_KERNEL[*]} | xargs) ]"
-echo -e "${INFO} [ ${#RK3588_KERNEL[*]} ] lists of rk3588 Kernel: [ $(echo ${RK3588_KERNEL[*]} | xargs) ]"
-echo -e "${INFO} Use the latest kernel version: [ ${KERNEL_AUTO_LATEST} ] \n"
-# Show server start information
 echo -e "${INFO} Server CPU configuration information: \n$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
-echo -e "${INFO} Server memory usage: \n$(free -h) \n"
 echo -e "${INFO} Server space usage before starting to compile:\n$(df -hT ${PWD}) \n"
 
-# Loop to make OpenWrt
+# Packit OpenWrt
+init_var
+init_packit_repo
+[[ "${KERNEL_AUTO_LATEST}" == "true" ]] && query_kernel
+download_kernel
 make_openwrt
 out_github_env
 
