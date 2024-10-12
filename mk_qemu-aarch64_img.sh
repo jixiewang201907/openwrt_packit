@@ -8,6 +8,8 @@ init_work_env
 
 # Kernel image sources
 ###################################################################
+KERNEL_TAGS="stable"
+KERNEL_BRANCHES="mainline:all:>=:5.4"
 MODULES_TGZ=${KERNEL_PKG_HOME}/modules-${KERNEL_VERSION}.tar.gz
 check_file ${MODULES_TGZ}
 BOOT_TGZ=${KERNEL_PKG_HOME}/boot-${KERNEL_VERSION}.tar.gz
@@ -26,6 +28,14 @@ echo "Use $OPWRT_ROOTFS_GZ as openwrt rootfs!"
 TGT_IMG="${WORK_DIR}/openwrt_${PLATFORM}_${SOC}_${OPENWRT_VER}_k${KERNEL_VERSION}${SUBVER}_update.img"
 # Target qcow2 Image
 TGT_QCOW2_IMG="${OUTPUT_DIR}/openwrt_${PLATFORM}_${OPENWRT_VER}_k${KERNEL_VERSION}${SUBVER}.qcow2"
+
+# 20240319 add
+LXC_PLATFORM="aarch64-lxc"
+# Target LXC rootfs
+TGT_LXC_ROOTFS="${OUTPUT_DIR}/openwrt_${OPENWRT_VER}_${LXC_PLATFORM}.tar"
+# compress: gzip | zstd | xz | none
+LXC_ROOTFS_COMPRESS="xz"
+
 ###################################################################
 
 check_depends
@@ -102,6 +112,7 @@ write_release_info
 write_banner
 config_first_run
 create_snapshot "etc-000"
+archive_lxc_rootfs
 clean_work_env
 sync
 echo "------------------------------------------------------------"

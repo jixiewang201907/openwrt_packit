@@ -18,6 +18,8 @@ fi
 
 # Kernel image sources
 ###################################################################
+KERNEL_TAGS="rk3588"
+KERNEL_BRANCHES="bsp:rk3588:>=:5.10 mainline:all:>=:6.6"
 MODULES_TGZ=${KERNEL_PKG_HOME}/modules-${KERNEL_VERSION}.tar.gz
 check_file ${MODULES_TGZ}
 BOOT_TGZ=${KERNEL_PKG_HOME}/boot-${KERNEL_VERSION}.tar.gz
@@ -106,6 +108,10 @@ SSHD_CIPHERS="aes256-gcm@openssh.com,aes128-gcm@openssh.com,chacha20-poly1305@op
 PWM_FAN="${PWD}/files/rk3588/rock5b/pwm-fan.pl"
 # 20221001 add
 MODULES_HOME="${PWD}/files/rk3588/modules.d"
+# 20221022
+BOARD_HOME="${PWD}/files/rk3588/rock5b/board.d"
+# 20230801 add
+BOARD_MODULES_HOME="${PWD}/files/rk3588/rock5b/modules.d"
 
 # 20230903 add
 DC_VOLTAGE_PATCH="${PWD}/files/rk3588/rock5b/dc_voltage.patch"

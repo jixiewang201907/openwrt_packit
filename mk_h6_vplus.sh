@@ -104,11 +104,13 @@ SSHD_CIPHERS="aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ct
 # 20221102 add
 RGB_HOME="${PWD}/files/rgb"
 RGB_CONFIG="${PWD}/files/vplus/rgb"
+# 20240404 add
+MODULES_HOME="${PWD}/files/vplus/modules.d"
 ####################################################################
 
 check_depends
 SKIP_MB=16
-BOOT_MB=160
+BOOT_MB=256
 ROOTFS_MB=960
 SIZE=$((SKIP_MB + BOOT_MB + ROOTFS_MB))
 create_image "$TGT_IMG" "$SIZE"

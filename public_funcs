@@ -5,6 +5,7 @@ export ZSTD_LEVEL=6
 
 # global vars
 NETDATA_PATCH_HOME="${PWD}/files/netdata_patches"
+CGROUP2_PATCH_HOME="${PWD}/files/cgroup2_patches"
 
 get_random_mac ()
 {
@@ -78,6 +79,23 @@ function check_block_dev() {
         else
             sleep $2
         fi
+    fi
+}
+
+# 检查指定的 dtb.tar.gz 中是否存在指定的 dtb
+function check_fdtfile() {
+    local dtbs_tgz=$1
+    local fdtfile=$2
+    tar tvf "$dtbs_tgz" "$fdtfile" 2>/dev/null
+    if [ $? -ne 0 ];then
+            tar tvf "$dtbs_tgz" "./$fdtfile" 2>/dev/null
+            if [ $? -ne 0 ];then
+	        echo "not exists"
+	    else
+	        echo "exists"
+	    fi
+    else
+	    echo "exists"
     fi
 }
 
@@ -626,12 +644,39 @@ function patch_netdata() {
 			echo
 			echo "为 netdata 打补丁以支持更多监控功能 ..."
 			cd ${TGT_ROOT}
-			for p in "${NETDATA_PATCH_HOME}/common/*.patch";do
+			for p in $(ls ${NETDATA_PATCH_HOME}/common/*.patch);do
 				patch -p1 < $p
 			done
-			for p in "${NETDATA_PATCH_HOME}/${daemon}/*.patch";do
+			for p in $(ls ${NETDATA_PATCH_HOME}/${daemon}/*.patch);do
 				patch -p1 < $p
 			done
+			echo "完成"
+			echo
+		)
+	fi
+}
+
+# 为cgroupfs_mount软件包打cgroup2补丁
+function patch_cgroupfs_mount() {
+	local common_required="cgroupfs-mount"
+	local ret
+
+	ret=$(check_opkg_requires ${common_required})
+	if [ "$ret" != "ok" ];then
+		echo
+		return
+	fi
+
+	if [ -n "$CGROUP2_PATCH_HOME" ] && [ -d "$CGROUP2_PATCH_HOME" ];then
+		(
+			echo
+			echo "为 cgroupfs-mount 打补丁以支持 cgroup2 ..."
+			cd ${TGT_ROOT}
+			for p in $(ls ${CGROUP2_PATCH_HOME}/*.patch);do
+				echo "$p"
+				patch -p1 < $p 2>/dev/null
+			done
+			rm -f ./etc/init.d/*.rej ./etc/init.d/*.orig ./usr/bin/*.rej ./usr/bin/*.orig
 			echo "完成"
 			echo
 		)
@@ -929,7 +974,7 @@ config global
         option check_fs '0'
 
 config mount
-        option target '/overlay'
+        option target '/rom'
         option enabled '1'
         option enabled_fsck '1'
         option uuid '${ROOTFS_UUID}'
@@ -1104,6 +1149,8 @@ SOC=${SOC}
 BOARD=${BOARD}
 KERNEL_VERSION=${KERNEL_VERSION}
 K510=${K510}
+KERNEL_TAGS='${KERNEL_TAGS}'
+KERNEL_BRANCHES='${KERNEL_BRANCHES}'
 EOF
 
         if [ -f "./etc/uci-defaults/99-default-settings" ] && [ -n "${DISTRIB_REVISION}" ] && [ -n "${DISTRIB_DESCRIPTION}" ];then
@@ -1124,9 +1171,10 @@ UBOOT_OVERLOAD=${UBOOT_WITHOUT_FIP}
 EOF
         fi
 
-	if [ "${SOC}" == "rk3588" ];then
+        if [ "${SOC}" == "rk3588" ];then
             echo "LOCK_KERNEL=${LOCK_KERNEL}" >> ./etc/flippy-openwrt-release
         fi
+
 
         # only photonic need pcat-manager service
         if [ "${BOARD}" != "photonicat" ];then
@@ -1195,6 +1243,13 @@ function copy_supplement_files() {
                 sed -e "/exit/i\/usr/bin/pwm-fan.pl &" -i etc/rc.local
                 echo "完成"
             fi
+	    if [ "$SOC" == "rk3588s" ] && [ "$BOARD" == "rock5c" ] && [ -f "$PWM_FAN" ];then
+                echo "该机型有pwm风扇接口，故添加风扇调速脚本 ... "
+                cp -v $PWM_FAN ./usr/bin
+                echo "pwm_fan" > ./etc/modules.d/pwm_fan
+                sed -e "/exit/i\/usr/bin/pwm-fan.pl &" -i etc/rc.local
+                echo "完成"
+            fi
         fi
 
 	# ZIMO Zcube1 max 呼吸灯
@@ -1218,6 +1273,7 @@ function copy_supplement_files() {
         [ -n "$SYSFIXTIME_PATCH" ] && [ -f $SYSFIXTIME_PATCH ] && patch -p1 < $SYSFIXTIME_PATCH
         [ -n "$NETWORK_SERVICE_PATCH" ] && [ -f $NETWORK_SERVICE_PATCH ] && patch -p1 < $NETWORK_SERVICE_PATCH
 	patch_netdata
+	patch_cgroupfs_mount
         [ -n "$FORCE_REBOOT" ] && [ -f $FORCE_REBOOT ] && cp -v $FORCE_REBOOT usr/sbin/ 
 
         [ -n "$GET_RANDOM_MAC" ] && [ -f ${GET_RANDOM_MAC} ] && cp -v ${GET_RANDOM_MAC} ./usr/bin/
@@ -1852,7 +1908,7 @@ function write_uboot_to_disk() {
         fi
 
 	# rockchip的bootloader，统一从硬盘的第65个扇区开始至16MB这个范围
-        if [ "$PLATFORM" == "rockchip" ] && [ -n "$BOOTLOADER_IMG" ] && [ -f "$BOOTLOADER_IMG" ];then
+        if [ "$PLATFORM" == "rockchip" ] && [ -n "$BOOTLOADER_IMG" ];then
             echo "写入 bootloader ..."
             local btld_home=${BOOTLOADER_IMG%/*}
 	    if [ -f "${btld_home}/idbloader.img" ] && [ -f "${btld_home}/u-boot.itb" ];then
@@ -1860,9 +1916,11 @@ function write_uboot_to_disk() {
                 dd if=${btld_home}/idbloader.img of=${TGT_DEV} conv=fsync,notrunc bs=512 seek=64
                 echo "dd if=${btld_home}/u-boot.itb of=${TGT_DEV} conv=fsync,notrunc bs=512 seek=16384"
                 dd if=${btld_home}/u-boot.itb of=${TGT_DEV} conv=fsync,notrunc bs=512 seek=16384
-            else
+	    elif [ -f "$BOOTLOADER_IMG" ];then
                 echo "dd if=${BOOTLOADER_IMG} of=${TGT_DEV} conv=fsync,notrunc bs=512 skip=64 seek=64"
                 dd if=${BOOTLOADER_IMG} of=${TGT_DEV} conv=fsync,notrunc bs=512 skip=64 seek=64
+	    else
+                echo "未发现可用的 bootload, 固件可能无法引导！"
             fi
             sync
 
@@ -1935,4 +1993,49 @@ function append_custom_uci_defaults_command {
     cat "$TGT_ROOT/etc/uci-defaults/zzz_custom_settings"
     echo "==========================="
 
+}
+
+# 导出LXC rootfs 镜像
+function archive_lxc_rootfs {
+    if [ -n "$TGT_LXC_ROOTFS" ];then
+        local lxc_ext
+	local compress_progress
+
+        echo "==============================================================================="
+        echo "制作 LXC 容器镜像 ..."
+
+	case $LXC_ROOTFS_COMPRESS in
+            gzip) lxc_ext=".gz"
+		  if which pigz;then
+		      compress_prog="| pigz"
+		  else
+		      compress_prog="| gzip"
+		      echo "小知识： 对于 gzip 压缩算法， 可以安装并发版的 pigz 应用程序来加速压缩"
+		  fi
+		  ;;
+	    zstd) lxc_ext=".zst"
+		  compress_prog="| zstd"
+		  ;;
+	      xz) lxc_ext=".xz"
+		  echo "由于采用了 xz 压缩算法，制作时间会很长，请耐心等待 ... "
+		  compress_prog="| xz -T 0"
+		  ;;
+	       *) lxc_ext=""
+		  compress_prog=""
+		  ;;
+        esac
+
+        (
+           cd ${TGT_ROOT}
+           eval tar --exclude="lib/firmware/*" \
+	            --exclude="lib/modules/*" \
+		    --exclude="boot/*" \
+		    --exclude=".snapshots" \
+		    -cf - . \
+	            $compress_prog > ${TGT_LXC_ROOTFS}${lxc_ext}
+        )
+
+        echo "制作完成, LXC 容器镜像是 ${TGT_LXC_ROOTFS}${lxc_ext}"
+        echo "==============================================================================="
+    fi
 }
